@@ -1,0 +1,907 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\hypersetup{
+  pdftitle={An Exact Rogers--Fine Proof that the Cyclotomic Mock-Theta Constant Satisfies c0(Tp)=3},
+  pdfauthor={Joesph D. Burke III},
+  pdfsubject={Finite Rogers--Fine identities and a companion Lean 4 formalization},
+  pdfkeywords={mock theta functions, cyclotomic fields, Rogers--Fine identity, Lean 4}
+}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+\DeclareMathOperator{\Tr}{Tr}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\zZ}{\mathbb{Z}}
+\newcommand{\qpoch}[2]{\left(#1;#2\right)}
+\newcommand{\Pp}{P}
+\newcommand{\Aexp}[1]{\tfrac{#1(3#1+1)}{2}}
+\newcommand{\weight}[1]{\left(\tfrac{3p-1}{2}-3#1\right)}
+
+\title{\bfseries An Exact Rogers--Fine Proof that the Cyclotomic\\ Mock-Theta Constant Satisfies $c_0(T_p)=3$}
+\author{Joesph D. Burke III\\[2pt]
+\normalsize with a companion Lean~4 formalization}
+\date{July 18, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Let $p\ge 7$ be prime, let $\zeta$ be a primitive $p$-th root of unity, and let
+\[
+  T_p \;=\; \sum_{r=0}^{p-1}\frac{\zeta^{r^2}}{\bigl(-\zeta;\zeta\bigr)_r^{\,2}}\;\in\;\Z[\zeta]
+\]
+be the cyclotomic value attached to Ramanujan's third-order mock theta function $f(q)$ by the odd-order radial-limit theorem of~\cite{Burke2026}, where $\lim_{r\to1^-}f(r\zeta)=\tfrac43 T_p$. Writing $T_p=\sum_{m=0}^{p-2}c_m\zeta^m$ in the power basis $\{1,\zeta,\dots,\zeta^{p-2}\}$, the constant coordinate $c_0(T_p)$ was conjectured in~\cite{Burke2026} to equal $3$ for every prime $p\ge 7$ (verified there exhaustively to $p\le 10^4$), and identified as the one arithmetic invariant of the ``mock Gauss sum'' $T_p$ that is provably invisible to every symmetric function of its Galois conjugates.
+
+We prove the conjecture. The proof is a finite specialization of the Rogers--Fine identity. Its output is the exact weighted quadratic formula
+\[
+  \boxed{\;T_p \;=\; \frac1p\sum_{n=0}^{p-1}\Bigl(\tfrac{3p-1}{2}-3n\Bigr)\,\zeta^{-n(3n+1)/2}\;}
+\]
+valid for every prime $p\ge 7$, from which $c_0(T_p)=3$ follows because only four quadratic residues contribute to the two relevant redundant coordinates. The argument uses no asymptotics, no Eichler integral, and no unverified analytic input; the Fine collapse and the Rogers--Fine identity are established as \emph{finite polynomial $q$-difference identities}, and the ``$\ell$'H\^opital'' step of the classical derivation is replaced by a single formal differentiation. The complete argument has been formalized in Lean~4 over Mathlib; the formalization is machine-checked, contains no \texttt{sorry}, \texttt{admit}, or added axioms, and additionally certifies that every power-basis coefficient of $T_p$ lies in $\{0,1,2,3\}$ and that $\Tr_{\Q(\zeta)/\Q}(T_p)$ equals $2p-1$ or $p-1$ according to $p\bmod 6$.
+\end{abstract}
+
+\tableofcontents
+
+\section{Introduction}\label{sec:intro}
+
+Ramanujan's third-order mock theta function is
+\[
+  f(q)\;=\;\sum_{n\ge0}\frac{q^{n^2}}{(-q;q)_n^{2}},\qquad
+  (a;q)_n:=\prod_{j=0}^{n-1}(1-aq^{j}).
+\]
+At a primitive $p$-th root of unity $\zeta$ the series is singular, but its radial limit exists and is governed by a finite cyclotomic element. Writing $(-\zeta;\zeta)_r=\prod_{j=1}^r(1+\zeta^{j})$, the odd-order radial-limit theorem of~\cite{Burke2026} gives, for every odd prime $p$,
+\begin{equation}\label{eq:radial}
+  \lim_{r\to1^{-}}f(r\zeta)\;=\;\tfrac43\,T_p,
+  \qquad
+  T_p:=\sum_{r=0}^{p-1}\frac{\zeta^{r^2}}{(-\zeta;\zeta)_r^{2}}\;\in\;\Z[\zeta].
+\end{equation}
+The element $T_p$ lies in the ring of integers of $\Q(\zeta)$ and, in the power basis $\{1,\zeta,\dots,\zeta^{p-2}\}$, has a distinguished constant coordinate
+\[
+  c_0(T_p)\in\Z,\qquad\text{where } T_p=\sum_{m=0}^{p-2}c_m\zeta^{m}.
+\]
+
+\subsection*{The problem}
+The paper~\cite{Burke2026} carried out an extensive study of $c_0(T_p)$, established a chain of unconditional reductions, and framed $T_p$ as a \emph{mock Gauss sum}: modulo a prime above $3$ it collapses to a shifted quadratic Gauss sum, and conjecturally lifts in characteristic $0$ to a Gauss-sum part plus a $0/1$ ``mock'' correction. Two features made the constant coordinate resistant to standard tools.
+\begin{enumerate}[leftmargin=2em]
+  \item \emph{Galois non-invariance.} It was proved in~\cite{Burke2026} that $c_0(T_p)$ is not a symmetric function of the conjugates of $T_p$: it is determined neither by the trace, the norm, the characteristic polynomial, nor any class $L$-value. Concretely, for the automorphism $\sigma_2:\zeta\mapsto\zeta^2$ one has $c_0(\sigma_2 T_p)=c_0(T_p)-c_{(p-1)/2}(T_p)$, so any presentation of $c_0$ through symmetric data must fail.
+  \item \emph{Moment obstruction.} Standard moment/analytic estimates bound $c_0$ only to size $O(\sqrt p)$, far from the constant value $3$.
+\end{enumerate}
+The conjecture $c_0(T_p)=3$ was verified computationally to $p\le 10^{4}$ and left open, with the residual difficulty isolated as a single analytic computation (an odd-order additive-twisted Eichler-integral evaluation).
+
+\subsection*{Result}
+We resolve the conjecture by producing the missing exact identity directly, bypassing the analytic route.
+
+\begin{theorem}[Main theorem]\label{thm:main}
+For every prime $p\ge 7$ and every primitive $p$-th root of unity $\zeta$,
+\[
+  c_0(T_p)=3 .
+\]
+\end{theorem}
+
+The engine is a finite weighted quadratic identity, whose statement should be compared with a Gauss sum $\sum_n \zeta^{-n(3n+1)/2}$ carrying a linear weight.
+
+\begin{theorem}[Weighted Rogers--Fine formula]\label{thm:weighted}
+For every prime $p\ge 7$,
+\begin{equation}\label{eq:weighted}
+  T_p \;=\; \frac1p\sum_{n=0}^{p-1}\Bigl(\tfrac{3p-1}{2}-3n\Bigr)\,\zeta^{-n(3n+1)/2}.
+\end{equation}
+\end{theorem}
+
+The quadratic exponent $A_n:=n(3n+1)/2$ is Euler's pentagonal exponent. Passing to the redundant spanning set $\{1,\zeta,\dots,\zeta^{p-1}\}$, the coefficient of $\zeta^{0}$ receives contributions from the residues $n$ with $A_n\equiv 0\pmod p$, and the coefficient of $\zeta^{-1}=\zeta^{p-1}$ from those with $A_n\equiv 1$. Because $p\ne 3$, each congruence has exactly two solutions, and the linear weight collapses their difference to $3(p-1)+3=3p$; dividing by $p$ gives Theorem~\ref{thm:main}.
+
+\subsection*{Method and rigor}
+Equation~\eqref{eq:weighted} is a specialization of the classical Rogers--Fine identity. At a root of unity the na\"ive derivation involves radial limits, a $0/0$ indeterminacy resolved by $\ell$'H\^opital, and a removable singularity in one summand; each is a genuine analytic subtlety. We avoid all three. The two $q$-series identities we need---Fine's collapse and the Rogers--Fine identity---are recast as \emph{finite polynomial identities} in $K[X]$, where $K$ is any characteristic-zero field containing a primitive $p$-th root of unity, and are proved by first-order polynomial $q$-difference equations together with a uniqueness lemma (Sections~\ref{sec:cyclotomic}--\ref{sec:rogersfine}). The weighted formula~\eqref{eq:weighted} then arises by differentiating a single polynomial identity once and evaluating at $X=1$ (Section~\ref{sec:weighted}); the removable singularity disappears because polynomial differentiation never divides. The constant-coordinate extraction (Section~\ref{sec:extract}) is elementary linear algebra over $\Q$.
+
+Every step has been formalized in Lean~4 over Mathlib (Section~\ref{sec:lean}). The formalization proves Theorem~\ref{thm:main} for all primes $p\ge 7$ in every characteristic-zero cyclotomic extension of $\Q$; it has no \texttt{sorry}, \texttt{admit}, or additional axioms, and its principal-theorem axiom audit reports only Lean's three standard axioms.
+
+\subsection*{Relation to the mock Gauss-sum programme}
+Formula~\eqref{eq:weighted} is precisely the exact ``theta-like'' object that the analytic programme of~\cite{Burke2026} sought: the mock correction is realized concretely as the linear weight $\tfrac{3p-1}{2}-3n$ attached to a pentagonal Gauss sum, rather than as an additive-twisted Eichler integral. The Galois non-invariance obstruction of~\cite{Burke2026} is respected---the proof genuinely uses non-symmetric data, namely the ordering of the exponents $A_n$ modulo $p$---but it does so through a finite quadratic sum rather than a transcendental period. We discuss this, and correct one auxiliary claim of~\cite{Burke2026}, in Section~\ref{sec:remarks}.
+
+\medskip
+\noindent\textit{Notation.} Throughout, $p\ge 7$ is a prime and $\zeta$ a primitive $p$-th root of unity in a field of characteristic $0$. We write $u:=\zeta^{-1}$, which is again a primitive $p$-th root of unity, and set
+\[
+  P_n \;:=\; (-u;u)_n \;=\; \prod_{j=1}^{n}\bigl(1+u^{j}\bigr),\qquad P_0=1 .
+\]
+For $f\in K[X]$ we write $f(uX)$ for the image of $f$ under $X\mapsto uX$.
+
+\section{Cyclotomic product identities}\label{sec:cyclotomic}
+
+We first record the two elementary product identities on which everything rests. Let $K$ be a field of characteristic $0$ and $u\in K$ a primitive $p$-th root of unity with $p$ odd.
+
+\begin{lemma}\label{lem:nonzero}
+For every $j\ge 0$ we have $1+u^{j}\ne 0$.
+\end{lemma}
+
+\begin{proof}
+If $1+u^{j}=0$ then $u^{j}=-1$, hence $1=(u^{j})^{p}=(-1)^{p}=-1$ because $p$ is odd, contradicting $\operatorname{char}K=0$.
+\end{proof}
+
+\begin{lemma}[Full cycle product]\label{lem:fullcycle}
+In $K[X]$,
+\[
+  \prod_{j=0}^{p-1}\bigl(1+u^{j}X\bigr)\;=\;1+X^{p}.
+\]
+\end{lemma}
+
+\begin{proof}
+Since $u$ is a primitive $p$-th root of unity and $p$ is odd, the elements $-u^{0},\dots,-u^{p-1}$ are exactly the roots of $X^{p}+1$, so
+\[
+  X^{p}+1=\prod_{j=0}^{p-1}\bigl(X+u^{j}\bigr).
+\]
+Applying the degree-$p$ reversal $g(X)\mapsto X^{\deg g}g(1/X)$ to both sides---which sends $X^{p}+1$ to $1+X^{p}$ and each factor $X+u^{j}$ to $1+u^{j}X$---gives the claim.
+\end{proof}
+
+\begin{lemma}[Cyclotomic defect]\label{lem:defect}
+$\displaystyle\prod_{j=1}^{p-1}\bigl(1+u^{j}\bigr)=1$; equivalently $P_{p-1}=1$. Moreover $P_p=2$.
+\end{lemma}
+
+\begin{proof}
+Evaluate Lemma~\ref{lem:fullcycle} at $X=1$:
+$\prod_{j=0}^{p-1}(1+u^{j})=1+1=2$. The $j=0$ factor equals $1+u^{0}=2$, and $2\ne 0$ in $K$, so cancelling it gives $\prod_{j=1}^{p-1}(1+u^{j})=1$. Finally $P_p=P_{p-1}\,(1+u^{p})=1\cdot 2=2$ since $u^p=1$.
+\end{proof}
+
+\noindent In particular $P_n\ne 0$ for all $n$ (a product of nonzero factors), and the ``defect'' $P_{p-1}=1$ makes the sequence $P_n$ periodic up to scale: $P_{n+p}=2P_n$.
+
+\begin{remark}
+Lemma~\ref{lem:defect} holds for every \emph{odd} order, prime or composite. This corrects a claim in~\cite{Burke2026} to the effect that $\prod_{j=1}^{k-1}(1+\zeta^{j})$ fails to equal $1$ for composite $k$ and could serve as a primality test; the product equals $1$ for all odd $k>1$. See Section~\ref{sec:remarks}.
+\end{remark}
+
+\section{The finite Fine collapse}\label{sec:fine}
+
+Fine's classical identity for the mock theta function is
+\[
+  f(q)=1+\sum_{n\ge1}\frac{(-1)^{n-1}q^n}{(-q;q)_n}
+\]
+\cite[Ch.~3]{Fine1988},~\cite{ChenJiLiu2012}. Specialized through~\eqref{eq:radial}, it collapses $T_p$ to a linear Pochhammer sum. We prove the finite form directly as a polynomial identity, with no appeal to convergence. Throughout this section write
+\[
+  Q_n:=(-\zeta;\zeta)_n^{-1}
+      =\prod_{j=1}^{n}\bigl(1+\zeta^j\bigr)^{-1},
+  \qquad Q_0=1,
+\]
+and define in $K[X]$ the generating polynomials
+\[
+  \mathcal L(X):=\sum_{n=0}^{p-1}(-1)^nQ_nX^n,
+\]
+\[
+  \mathcal R(X):=
+  \sum_{n=0}^{p-1}
+  Q_n\zeta^{n^2}X^n
+  \prod_{k=n+1}^{p-1}\bigl(1+\zeta^kX\bigr).
+\]
+Thus $\mathcal R$ is the finite ``other side'' of Fine's identity, written in base $\zeta$; in particular, its summands carry no factor $(-1)^n$.
+
+\begin{lemma}[$q$-difference equations]\label{lem:fineqdiff}
+Both $\mathcal L$ and $\mathcal R$ satisfy
+\begin{equation}\label{eq:fineqdiff}
+  (1+X)F(X)+F(\zeta X)=2+X^p.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+Let
+\[
+  \lambda_n(X):=(-1)^nQ_nX^n.
+\]
+For $0\le n\le p-2$,
+\[
+  \lambda_{n+1}(X)+\lambda_{n+1}(\zeta X)
+  =-X\lambda_n(X),
+\]
+because $Q_{n+1}(1+\zeta^{n+1})=Q_n$. Consequently all interior terms in
+$(1+X)\mathcal L(X)+\mathcal L(\zeta X)$ cancel. The constant boundary contributes $2Q_0=2$, while the upper boundary contributes $X^p$, since $p-1$ is even and
+\[
+  Q_{p-1}
+  =\left(\prod_{j=1}^{p-1}(1+\zeta^j)\right)^{-1}
+  =1
+\]
+by Lemma~\ref{lem:defect}. Hence
+\[
+  (1+X)\mathcal L(X)+\mathcal L(\zeta X)=2+X^p.
+\]
+
+For the right side, let
+\[
+  \rho_n(X):=
+  Q_n\zeta^{n^2}X^n
+  \prod_{k=n+1}^{p-1}(1+\zeta^kX)
+\]
+and introduce the certificate
+\[
+  \gamma_n(X):=
+  -(1+X)(1+\zeta^n)\rho_n(X).
+\]
+For $0\le n\le p-2$, direct substitution gives
+\begin{equation}\label{eq:finecert}
+  (1+X)\rho_n(X)+\rho_n(\zeta X)
+  =\gamma_{n+1}(X)-\gamma_n(X).
+\end{equation}
+Indeed, this is obtained from
+\[
+  Q_{n+1}(1+\zeta^{n+1})=Q_n,
+  \qquad
+  (n+1)^2=n^2+2n+1,
+\]
+together with
+\[
+  \prod_{k=n+1}^{p-1}(1+\zeta^kX)
+  =(1+\zeta^{n+1}X)
+   \prod_{k=n+2}^{p-1}(1+\zeta^kX)
+\]
+and the corresponding shift under $X\mapsto\zeta X$.
+
+The last summand satisfies the separate boundary identity
+\begin{equation}\label{eq:finelast}
+  (1+X)\rho_{p-1}(X)+\rho_{p-1}(\zeta X)
+  =-X^p-\gamma_{p-1}(X).
+\end{equation}
+Here one uses $Q_{p-1}=1$, $\zeta^{(p-1)^2}=\zeta$, and
+$\zeta^{p-1}\zeta=1$. Summing~\eqref{eq:finecert} and adding~\eqref{eq:finelast} telescopes to
+\[
+  (1+X)\mathcal R(X)+\mathcal R(\zeta X)
+  =-\gamma_0(X)-X^p.
+\]
+Finally,
+\[
+  \gamma_0(X)
+  =-2(1+X)\prod_{k=1}^{p-1}(1+\zeta^kX)
+  =-2(1+X^p)
+\]
+by Lemma~\ref{lem:fullcycle}. Therefore
+\[
+  (1+X)\mathcal R(X)+\mathcal R(\zeta X)
+  =2+X^p.
+\]
+\end{proof}
+
+\begin{lemma}[Uniqueness]\label{lem:fineunique}
+If $H\in K[X]$ satisfies
+\[
+  (1+X)H(X)+H(\zeta X)=0,
+\]
+then $H=0$.
+\end{lemma}
+
+\begin{proof}
+Write $H(X)=\sum_{n\ge0}h_nX^n$. Comparing constant coefficients gives
+$2h_0=0$, hence $h_0=0$. Comparing coefficients of $X^{n+1}$ gives
+\[
+  (1+\zeta^{n+1})h_{n+1}+h_n=0.
+\]
+By induction $h_n=0$, and Lemma~\ref{lem:nonzero} gives
+$1+\zeta^{n+1}\ne0$, so $h_{n+1}=0$. Thus every coefficient of $H$ vanishes.
+\end{proof}
+
+\begin{proposition}[Finite Fine identity]\label{prop:fineeq}
+In $K[X]$,
+\[
+  \mathcal L(X)=\mathcal R(X).
+\]
+Consequently,
+\[
+  T_p=\sum_{n=0}^{p-1}(-1)^nQ_n.
+\]
+\end{proposition}
+
+\begin{proof}
+By Lemma~\ref{lem:fineqdiff}, the difference
+$H=\mathcal L-\mathcal R$ satisfies
+\[
+  (1+X)H(X)+H(\zeta X)=0.
+\]
+Lemma~\ref{lem:fineunique} therefore gives $H=0$.
+
+Evaluate at $X=1$. Clearly,
+\[
+  \mathcal L(1)=\sum_{n=0}^{p-1}(-1)^nQ_n.
+\]
+For the other side, Lemma~\ref{lem:defect} gives
+\[
+  \prod_{k=n+1}^{p-1}(1+\zeta^k)
+  =
+  \frac{\prod_{k=1}^{p-1}(1+\zeta^k)}
+       {\prod_{k=1}^{n}(1+\zeta^k)}
+  =Q_n.
+\]
+Hence the $n$-th summand of $\mathcal R(1)$ equals
+\[
+  Q_n\zeta^{n^2}Q_n
+  =
+  \frac{\zeta^{n^2}}{(-\zeta;\zeta)_n^2}.
+\]
+Thus $\mathcal R(1)=T_p$, proving the collapse.
+\end{proof}
+
+Reindexing $n\mapsto p-1-n$ in Proposition~\ref{prop:fineeq} gives the form used below. Since $p-1$ is even,
+\[
+  (-1)^{p-1-n}=(-1)^n,
+\]
+and Lemma~\ref{lem:defect} gives
+\[
+\begin{aligned}
+  Q_{p-1-n}
+  &=
+  \prod_{k=1}^{p-1-n}(1+\zeta^k)^{-1}\\
+  &=
+  \prod_{k=p-n}^{p-1}(1+\zeta^k)\\
+  &=
+  \prod_{j=1}^{n}(1+\zeta^{-j}).
+\end{aligned}
+\]
+
+\begin{proposition}[Reverse-Fine collapse]\label{prop:reversefine}
+For every odd prime $p$,
+\begin{equation}\label{eq:reversefine}
+  T_p
+  =
+  \sum_{n=0}^{p-1}(-1)^nP_n,
+  \qquad
+  P_n=\prod_{j=1}^{n}(1+\zeta^{-j}).
+\end{equation}
+\end{proposition}
+
+\section{The finite Rogers--Fine identity}\label{sec:rogersfine}
+
+The Rogers--Fine identity~\cite[Ch.~14]{Fine1988},~\cite{AndrewsJelinek2014} is
+\[
+  \sum_{n\ge0}\frac{(aq;q)_n}{(bq;q)_n}t^{n}
+  =\sum_{n\ge0}\frac{(aq;q)_n(atq/b;q)_n\,b^{n}t^{n}q^{n^2}\bigl(1-atq^{2n+1}\bigr)}{(bq;q)_n\,(t;q)_{n+1}} .
+\]
+Taking the confluent limit $b\to 0$, then $a=-1$, $q=u$, $t=-X$, gives (after clearing denominators) a \emph{polynomial} identity that we now state and prove directly. Define the reverse-Fine generating polynomial
+\[
+  L(X):=\sum_{n=0}^{p-1}(-1)^{n}P_n\,X^{n},
+\]
+so that $L(1)=T_p$ by Proposition~\ref{prop:reversefine}, and the denominator-cleared right-hand side
+\[
+  R(X):=\sum_{n=0}^{p-1} P_n\,u^{A_n}\,X^{2n}\bigl(1-u^{2n+1}X\bigr)\!\!\prod_{k=n+1}^{p-1}\!\bigl(1+u^{k}X\bigr),
+  \qquad A_n=\tfrac{n(3n+1)}{2}.
+\]
+
+\begin{lemma}[$q$-difference equations]\label{lem:rfqdiff}
+In $K[X]$,
+\begin{align}
+  (1+X)\,L(X)+uX\,L(uX) &= 1+2X^{p}, \label{eq:Lqdiff}\\
+  (1+X)\,R(X)+uX\,R(uX) &= 1+X^{p}-2X^{2p}. \label{eq:Rqdiff}
+\end{align}
+\end{lemma}
+
+\begin{proof}
+For~\eqref{eq:Lqdiff}, put
+\[
+  \ell_n(X):=(-1)^nP_nX^n.
+\]
+The recurrence $P_{n+1}=P_n(1+u^{n+1})$ gives
+\[
+  X\ell_n(X)+uX\ell_n(uX)=-\ell_{n+1}(X).
+\]
+Summing this relation for $0\le n\le p-1$ leaves the two boundary
+terms $\ell_0=1$ and $-\ell_p=2X^p$, since $p$ is odd and $P_p=2$.
+This proves~\eqref{eq:Lqdiff}.
+
+For~\eqref{eq:Rqdiff}, write
+\[
+  \Pi_n(X):=\prod_{k=n+1}^{p-1}(1+u^kX)
+\]
+and define the summand and certificate by
+\begin{align*}
+  \varrho_n(X)
+  &:=P_nu^{A_n}X^{2n}(1-u^{2n+1}X)\Pi_n(X),\\
+  g_n(X)
+  &:=P_nu^{A_n}X^{2n}(1+X)\Pi_n(X).
+\end{align*}
+Thus $R(X)=\sum_{n=0}^{p-1}\varrho_n(X)$.  We claim that, for
+$0\le n\le p-2$,
+\begin{equation}\label{eq:rfcert}
+  (1+X)\varrho_n(X)+uX\varrho_n(uX)
+  =g_n(X)-g_{n+1}(X).
+\end{equation}
+Indeed,
+\[
+  \Pi_n(X)=(1+u^{n+1}X)\Pi_{n+1}(X),
+  \qquad
+  \Pi_n(uX)=(1+X)\Pi_{n+1}(X),
+\]
+where the last factor in the shifted product is
+$1+u^pX=1+X$.  Factoring the left side of~\eqref{eq:rfcert} gives
+\begin{align*}
+ &(1+X)\varrho_n(X)+uX\varrho_n(uX)\\
+ &\quad=P_nu^{A_n}X^{2n}(1+X)\Pi_{n+1}(X)\\
+ &\qquad\quad\times\Bigl[
+   (1-u^{2n+1}X)(1+u^{n+1}X)
+   +u^{2n+1}X(1-u^{2n+2}X)
+ \Bigr]\\
+ &\quad=P_nu^{A_n}X^{2n}(1+X)\Pi_{n+1}(X)\\
+ &\qquad\quad\times\Bigl[
+   1+u^{n+1}X-(1+u^{n+1})u^{3n+2}X^2
+ \Bigr].
+\end{align*}
+The first two terms in the last bracket give $g_n(X)$.  Using
+\[
+  P_{n+1}=P_n(1+u^{n+1}),
+  \qquad
+  A_{n+1}=A_n+3n+2,
+\]
+the remaining term is $-g_{n+1}(X)$, proving the certificate identity.
+
+The final summand is a separate boundary calculation.  Set $n=p-1$.
+Then $P_n=1$ and $\Pi_n=1$.  Moreover
+\[
+  u^{A_p}=1,
+  \qquad
+  A_p=A_n+3n+2,
+  \qquad
+  n+1=p,
+\]
+so $u^p=1$ implies
+\[
+  u^{A_n+2n+1}=1,
+  \qquad
+  u^{A_n+4n+3}=1.
+\]
+Consequently
+\begin{align*}
+ &(1+X)\varrho_{p-1}(X)+uX\varrho_{p-1}(uX)\\
+ &\quad=X^{2n}\Bigl[
+   u^{A_n}(1+X)
+   -\bigl(u^{A_n+2n+1}+u^{A_n+4n+3}\bigr)X^2
+ \Bigr]\\
+ &\quad=g_{p-1}(X)-2X^{2p}.
+\end{align*}
+At the initial boundary,
+\[
+  g_0(X)=(1+X)\prod_{k=1}^{p-1}(1+u^kX)=1+X^p
+\]
+by Lemma~\ref{lem:fullcycle}.  Summing~\eqref{eq:rfcert} for
+$0\le n\le p-2$ and adjoining the final boundary therefore telescopes to
+\[
+  (1+X)R(X)+uXR(uX)=g_0(X)-2X^{2p}
+  =1+X^p-2X^{2p},
+\]
+which is~\eqref{eq:Rqdiff}.
+\end{proof}
+
+\begin{lemma}[Uniqueness]\label{lem:rfunique}
+If $H\in K[X]$ satisfies $(1+X)H(X)+uX\,H(uX)=0$, then $H=0$.
+\end{lemma}
+
+\begin{proof}
+Coefficient of $X^{0}$: $H_0=0$. Coefficient of $X^{n+1}$: $H_{n+1}+H_{n}+u\cdot u^{\,n}H_{n}=0$, i.e. $H_{n+1}=-(1+u^{n+1})H_n$; by induction $H_n=0$ for all $n$.
+\end{proof}
+
+\begin{proposition}[Finite Rogers--Fine identity]\label{prop:rf}
+In $K[X]$,
+\begin{equation}\label{eq:FRF}
+  \bigl(1-X^{p}\bigr)\,L(X)\;=\;R(X).
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+Since $u^{p}=1$, the substitution $X\mapsto uX$ fixes $1-X^{p}$. Hence, using~\eqref{eq:Lqdiff},
+\[
+  (1+X)\bigl[(1-X^p)L\bigr]+uX\bigl[(1-X^p)L\bigr](uX)
+  =(1-X^{p})\bigl[(1+X)L+uX\,L(uX)\bigr]
+  =(1-X^{p})(1+2X^{p}),
+\]
+which equals $1+X^{p}-2X^{2p}$. By~\eqref{eq:Rqdiff}, the polynomial $H=(1-X^{p})L-R$ satisfies $(1+X)H+uX\,H(uX)=0$, so $H=0$ by Lemma~\ref{lem:rfunique}.
+\end{proof}
+
+\section{The weighted quadratic formula}\label{sec:weighted}
+
+We now differentiate~\eqref{eq:FRF} once and evaluate at $X=1$. This replaces the $0/0$ limit and $\ell$'H\^opital step of the analytic derivation; because we differentiate a polynomial identity, no denominator ever vanishes and the summand at $n=(p-1)/2$ (where $1-u^{2n+1}=0$) needs no special treatment.
+
+Let $\partial$ denote the formal derivative on $K[X]$. Differentiating~\eqref{eq:FRF} and evaluating at $X=1$: the left side gives
+\[
+  \partial\bigl[(1-X^{p})L\bigr]\big|_{X=1}=-p\,L(1)+0=-p\,T_p,
+\]
+since $(1-X^{p})|_{X=1}=0$ and $\partial(1-X^{p})|_{X=1}=-p$. The right side is $\partial R|_{X=1}=\sum_{n=0}^{p-1}\partial\varrho_n|_{X=1}$.
+
+\begin{lemma}[Termwise derivative]\label{lem:termderiv}
+For $0\le n\le p-1$, define the tail logarithmic derivative
+\[
+  T_{p,n}:=\sum_{k=n+1}^{p-1}\frac{u^k}{1+u^k}.
+\]
+Then
+\[
+  \partial\varrho_n(1)
+  =
+  u^{A_n}
+  \left[
+    2n\bigl(1-u^{2n+1}\bigr)
+    -u^{2n+1}
+    +\bigl(1-u^{2n+1}\bigr)T_{p,n}
+  \right].
+\]
+\end{lemma}
+
+\begin{proof}
+Write
+\[
+  \varrho_n(X)
+  =
+  P_nu^{A_n}X^{2n}
+  (1-u^{2n+1}X)\Pi_n(X),
+  \qquad
+  \Pi_n(X):=
+  \prod_{k=n+1}^{p-1}(1+u^kX).
+\]
+The product rule gives
+\[
+  \partial\Pi_n(1)=\Pi_n(1)T_{p,n}.
+\]
+Moreover,
+\[
+  \Pi_n(1)=P_n^{-1}
+\]
+by Lemma~\ref{lem:defect}. Thus the factors $P_n$ and $\Pi_n(1)$ cancel. The derivatives of
+$X^{2n}$, $1-u^{2n+1}X$, and $\Pi_n(X)$ contribute, respectively,
+\[
+  2n(1-u^{2n+1}),
+  \qquad
+  -u^{2n+1},
+  \qquad
+  (1-u^{2n+1})T_{p,n}.
+\]
+Adding them proves the formula. No division by
+$1-u^{2n+1}$ occurs, so the index $n=(p-1)/2$ requires no separate treatment.
+\end{proof}
+
+The next two identities are the finite reflection symmetries that make the sum collapse. They are the exact analogues of the classical facts $S_{p-1}=p/2$ and $S_n-S_{p-1-n}=n-\tfrac{p-1}{2}$.
+
+\begin{lemma}[Reflection symmetries]\label{lem:reflection}
+For $0\le n\le p-1$:
+\begin{enumerate}[leftmargin=2em,label=\textup{(\roman*)}]
+  \item $\dfrac{u^{j}}{1+u^{j}}+\dfrac{u^{-j}}{1+u^{-j}}=1$, hence $\displaystyle\sum_{j=0}^{p-1}\frac{u^{j}}{1+u^{j}}=\frac p2$;
+  \item $u^{A_n+2n+1}=u^{A_{p-1-n}}$, equivalently $A_n+2n+1\equiv A_{p-1-n}\pmod p$;
+  \item $T_{p,n}-T_{p,\,p-1-n}=\dfrac{p-1}{2}-n$.
+\end{enumerate}
+\end{lemma}
+
+\begin{proof}
+(i) Multiply numerator and denominator of the second term by $u^{j}$ to get $1/(1+u^{j})$, and add. Pairing $j\leftrightarrow p-j$ over $1\le j\le p-1$ (each pair summing to $1$) and adding the $j=0$ term $\tfrac12$ gives $\tfrac{p-1}{2}+\tfrac12=\tfrac p2$.
+(ii) Both sides double to $2A_n+2(2n+1)=n(3n+1)+2(2n+1)=3n^2+5n+2=(n{+}1)(3n{+}2)$ and $2A_{p-1-n}=(p-1-n)(3(p-1-n)+1)$; modulo $p$ these agree because $(p-1-n)\equiv-(1+n)$ and $3(p-1-n)+1\equiv-(3n+2)$, whose product is $(n{+}1)(3n{+}2)$. As $\gcd(2,p)=1$ the congruence descends. Raising $u$ to both sides gives the exponent identity.
+(iii) Put
+\[
+  f_j:=\frac{u^j}{1+u^j},
+  \qquad m:=p-1-n.
+\]
+Reflect the finite range $n+1\le r\le p-1$ by writing $r=p-j$.
+As $j$ then runs through $1,\dots,m$, part~(i) gives
+\begin{align*}
+  T_{p,n}
+  &=\sum_{r=n+1}^{p-1}f_r
+    =\sum_{j=1}^{m}f_{p-j}
+    =\sum_{j=1}^{m}(1-f_j)\\
+  &=m-\sum_{j=1}^{m}f_j.
+\end{align*}
+On the other hand, split the full finite cycle at $m$:
+\[
+  \frac p2
+  =\sum_{j=0}^{p-1}f_j
+  =f_0+\sum_{j=1}^{m}f_j+\sum_{j=m+1}^{p-1}f_j
+  =\frac12+\sum_{j=1}^{m}f_j+T_{p,m}.
+\]
+Thus $\sum_{j=1}^{m}f_j+T_{p,m}=(p-1)/2$, and hence
+\[
+  T_{p,n}-T_{p,m}
+  =m-\frac{p-1}{2}
+  =\frac{p-1}{2}-n.
+\]
+Since $m=p-1-n$, this is precisely the asserted identity.
+\end{proof}
+
+\begin{theorem}[Weighted formula; = Theorem~\ref{thm:weighted}]\label{thm:weighted2}
+\[
+  T_p
+  =
+  \frac1p\sum_{n=0}^{p-1}
+  \left(\frac{3p-1}{2}-3n\right)u^{A_n}
+  =
+  \frac1p\sum_{n=0}^{p-1}
+  \left(\frac{3p-1}{2}-3n\right)\zeta^{-A_n}.
+\]
+\end{theorem}
+
+\begin{proof}
+Summing Lemma~\ref{lem:termderiv} and comparing with
+\[
+  -pT_p=\left.\partial R\right|_{X=1},
+\]
+we obtain
+\begin{equation}\label{eq:master}
+  -pT_p
+  =
+  \sum_{n=0}^{p-1}
+  u^{A_n}
+  \left[
+    2n(1-u^{2n+1})
+    -u^{2n+1}
+    +(1-u^{2n+1})T_{p,n}
+  \right].
+\end{equation}
+We simplify the polynomial part and the $T_{p,n}$-part separately.
+
+For the polynomial part,
+\[
+\begin{aligned}
+  &\sum_{n=0}^{p-1}
+  u^{A_n}\left[2n-(2n+1)u^{2n+1}\right]\\
+  &\qquad=
+  \sum_{n=0}^{p-1}2n\,u^{A_n}
+  -
+  \sum_{n=0}^{p-1}(2n+1)u^{A_n+2n+1}.
+\end{aligned}
+\]
+By Lemma~\ref{lem:reflection}(ii),
+\[
+  u^{A_n+2n+1}=u^{A_{p-1-n}}.
+\]
+Reindexing the second sum by $m=p-1-n$ turns it into
+\[
+  \sum_{m=0}^{p-1}(2p-1-2m)u^{A_m}.
+\]
+Therefore the polynomial part equals
+\[
+  \sum_{n=0}^{p-1}(4n-2p+1)u^{A_n}.
+\tag{7.1}
+\]
+
+For the tail part,
+\[
+\begin{aligned}
+  &\sum_{n=0}^{p-1}
+  u^{A_n}(1-u^{2n+1})T_{p,n}\\
+  &\qquad=
+  \sum_{n=0}^{p-1}u^{A_n}T_{p,n}
+  -
+  \sum_{n=0}^{p-1}u^{A_n+2n+1}T_{p,n}.
+\end{aligned}
+\]
+Using Lemma~\ref{lem:reflection}(ii) and reindexing the second sum gives
+\[
+  \sum_{n=0}^{p-1}
+  u^{A_n}\bigl(T_{p,n}-T_{p,p-1-n}\bigr).
+\]
+Lemma~\ref{lem:reflection}(iii) therefore yields
+\[
+  \sum_{n=0}^{p-1}
+  \left(\frac{p-1}{2}-n\right)u^{A_n}.
+\tag{7.2}
+\]
+
+Adding~(7.1) and~(7.2),
+\[
+\begin{aligned}
+  -pT_p
+  &=
+  \sum_{n=0}^{p-1}
+  \left(
+    4n-2p+1+\frac{p-1}{2}-n
+  \right)u^{A_n}\\
+  &=
+  \sum_{n=0}^{p-1}
+  \left(
+    3n-\frac{3p-1}{2}
+  \right)u^{A_n}\\
+  &=
+  -
+  \sum_{n=0}^{p-1}
+  \left(
+    \frac{3p-1}{2}-3n
+  \right)u^{A_n}.
+\end{aligned}
+\]
+Dividing by $-p$ proves the first equality. The second follows from
+$u=\zeta^{-1}$.
+\end{proof}
+
+\section{Extraction of the constant coordinate}\label{sec:extract}
+
+We convert~\eqref{eq:weighted} from the redundant spanning set $\{1,\zeta,\dots,\zeta^{p-1}\}$ to the power basis $\{1,\zeta,\dots,\zeta^{p-2}\}$ and read off $c_0$.
+
+\begin{lemma}[Redundant-to-power basis]\label{lem:redundant}
+For any coefficients $C_0,\dots,C_{p-1}\in\Q$,
+\[
+  c_0\!\left(\sum_{m=0}^{p-1}C_m\,\zeta^{m}\right)=C_0-C_{p-1}.
+\]
+\end{lemma}
+
+\begin{proof}
+For $0\le m\le p-2$, $\zeta^{m}$ is a basis vector, contributing $C_m$ to its own coordinate and $0$ to $c_0$ unless $m=0$. The single redundant power is $\zeta^{p-1}=-(1+\zeta+\dots+\zeta^{p-2})$, whose constant coordinate is $-1$. Hence $c_0=C_0\cdot 1+C_{p-1}\cdot(-1)$.
+\end{proof}
+
+By~\eqref{eq:weighted}, $T_p=\sum_{m=0}^{p-1}C_m\zeta^{m}$, where the
+general redundant coefficient is
+\[
+  C_m
+  =\frac1p
+    \sum_{\substack{0\le n<p\\-A_n\equiv m\pmod p}}w_n
+  =\frac1p
+    \sum_{\substack{0\le n<p\\A_n\equiv -m\pmod p}}w_n,
+  \qquad
+  w_n=\frac{3p-1}{2}-3n.
+\]
+In particular, $C_0$ is supported on $A_n\equiv0$, while $C_{p-1}$ is
+supported on $A_n\equiv1$, because
+$-A_n\equiv p-1$ is equivalent to $A_n\equiv1$.  Thus, tracking
+$\zeta^{0}$ and $\zeta^{-1}=\zeta^{p-1}$,
+\[
+  c_0(T_p)=\frac1p\Bigl(\sum_{n:\,A_n\equiv 0}w_n-\sum_{n:\,A_n\equiv 1}w_n\Bigr),
+\]
+the two sums over $0\le n\le p-1$.
+
+\begin{lemma}[Four quadratic roots]\label{lem:roots}
+Let $p\ge 7$ and let $a\in\{0,\ldots,p-1\}$ be the canonical representative
+of $-3^{-1}\pmod p$. Then, for $0\le n\le p-1$,
+\[
+  A_n\equiv 0\pmod p\iff n\in\{0,\;a\},\qquad
+  A_n\equiv 1\pmod p\iff n\in\{p-1,\;a+1\},
+\]
+and the four residues $0,\,a,\,p-1,\,a+1$ are pairwise distinct.
+\end{lemma}
+
+\begin{proof}
+Since $\gcd(2,p)=1$, the congruence $A_n\equiv0$ is equivalent to
+$n(3n+1)\equiv0$.  Its solutions are $n\equiv0$ and
+$n\equiv-3^{-1}=a$.  Similarly,
+\[
+  A_n\equiv1
+  \iff 3n^2+n-2\equiv0
+  \iff (3n-2)(n+1)\equiv0.
+\]
+The two solutions are $n\equiv-1=p-1$ and $n\equiv2\cdot3^{-1}$.
+Because
+\[
+  a+1\equiv -3^{-1}+1
+  =(-1+3)3^{-1}
+  =2\cdot3^{-1}\pmod p,
+\]
+the latter solution is represented by $a+1$.
+
+It remains to check that these are four distinct representatives.  The
+relation $3a\equiv-1$ shows $a\ne0$.  If $a=p-1$, then
+$-3\equiv-1\pmod p$, so $p\mid2$, impossible for $p\ge7$.  Hence
+$a\ne p-1$, and since $0\le a<p$, we have $a+1<p$; thus $a+1$ is the
+actual representative in $\{0,\ldots,p-1\}$.  Now $a+1$ differs from $a$
+as an integer and is nonzero.  Finally, if $a+1=p-1$, then
+$2\cdot3^{-1}\equiv-1\pmod p$; multiplying by $3$ gives
+$2\equiv-3\pmod p$, so $p\mid5$, again impossible for $p\ge7$.
+Together with $0\ne p-1$, this proves pairwise distinctness.
+\end{proof}
+
+\begin{proof}[Proof of Theorem~\ref{thm:main}]
+By Lemma~\ref{lem:roots} the two sums are over $\{0,a\}$ and $\{p-1,a+1\}$, so
+\[
+  c_0(T_p)=\frac1p\bigl[(w_0+w_a)-(w_{p-1}+w_{a+1})\bigr]
+  =\frac1p\bigl[(w_0-w_{p-1})+(w_a-w_{a+1})\bigr].
+\]
+The weight $w_n=\tfrac{3p-1}{2}-3n$ is affine with slope $-3$, so $w_0-w_{p-1}=3(p-1)$ and $w_a-w_{a+1}=3$. Therefore
+\[
+  c_0(T_p)=\frac{3(p-1)+3}{p}=\frac{3p}{p}=3. \qedhere
+\]
+\end{proof}
+
+\section{Corollaries}\label{sec:cor}
+
+The same coordinate bookkeeping yields several global consequences for the coefficient vector. The following are proved in the same framework and formalized (Section~\ref{sec:lean}); we state them for completeness. Exact coefficient multiplicities are not yet formalized.
+
+\begin{proposition}[Coefficient classification]\label{prop:coeffclass}
+For every prime $p\ge 7$, each power-basis coefficient $c_m(T_p)$ lies in $\{0,1,2,3\}$.
+\end{proposition}
+
+Before stating the remaining formulas, define the sum of the power-basis
+coefficients by
+\[
+  T_p(1):=\sum_{m=0}^{p-2}c_m(T_p).
+\]
+
+\begin{proposition}[Coefficient sum]\label{prop:coeffsum}
+For every prime $p\ge7$,
+\[
+  T_p(1)=
+  \begin{cases}
+    p+1, & p\equiv1\pmod6,\\
+    2p+1, & p\equiv5\pmod6.
+  \end{cases}
+\]
+\end{proposition}
+
+\begin{proposition}[Trace]\label{prop:trace}
+For every prime $p\ge 7$,
+\[
+  \Tr_{\Q(\zeta)/\Q}(T_p)=
+  \begin{cases}
+    2p-1, & p\equiv 1 \pmod 6,\\
+    p-1, & p\equiv 5 \pmod 6.
+  \end{cases}
+\]
+\end{proposition}
+
+Propositions~\ref{prop:coeffsum} and~\ref{prop:trace} satisfy the
+character-free reformulation $T_p(1)+\Tr(T_p)=3p$ of~\cite{Burke2026}:
+indeed $p\,c_0(T_p)=T_p(1)+\Tr(T_p)$ from Lemma~\ref{lem:redundant}
+summed over all coordinates, and $c_0=3$ gives the result.
+
+\section{The Lean 4 formalization}\label{sec:lean}
+
+The entire argument above has been formalized in Lean~4 over Mathlib (toolchain \texttt{v4.31.0}). The development is self-contained apart from Mathlib and reproduces, as ordinary finite algebra, every identity of Sections~\ref{sec:cyclotomic}--\ref{sec:extract}. The main results are:
+
+\begin{itemize}[leftmargin=2em]
+  \item \texttt{MockTheta.fullCycleProd}, \texttt{cyclotomicDefect} --- Lemmas~\ref{lem:fullcycle}--\ref{lem:defect};
+  \item \texttt{MockTheta.finiteFine}, \texttt{fineCollapse}, \texttt{reverseFine} --- Proposition~\ref{prop:reversefine}, via the $q$-difference equations~\eqref{eq:fineqdiff} and uniqueness (Lemma~\ref{lem:fineunique});
+  \item \texttt{MockTheta.finiteRogersFine} --- Proposition~\ref{prop:rf}, the denominator-cleared identity~\eqref{eq:FRF};
+  \item \texttt{MockTheta.weighted\_formula}. This proves
+  Theorem~\ref{thm:weighted} by formal differentiation and evaluation at
+  $X=1$;
+  \item \texttt{MockTheta.c0\_T\_eq\_three} (public alias \texttt{constantCoeff\_T\_eq\_three}) --- Theorem~\ref{thm:main}, valid for every prime $p\ge 7$ in every characteristic-zero cyclotomic extension containing a primitive $p$-th root;
+  \item \texttt{MockTheta.TAtOne\_of\_eq\_six\_mul\_add\_one/five} --- Proposition~\ref{prop:coeffsum}, the two coefficient-sum formulas;
+  \item \texttt{MockTheta.cCoeff\_T\_mem\_four} --- Proposition~\ref{prop:coeffclass}, the universal coefficient classification;
+  \item \texttt{MockTheta.trace\_T\_of\_eq\_six\_mul\_add\_one/five} --- Proposition~\ref{prop:trace}, using Mathlib's algebra trace.
+\end{itemize}
+
+The development does not yet prove exact coefficient multiplicities, the
+characteristic-zero mock Gauss-sum lift, or the subset-count corollaries;
+these remain downstream results and are not used above.
+
+The constant coordinate is defined honestly as the coefficient of $1$ in Mathlib's cyclotomic power basis,
+\[
+  \texttt{c0}\ (h\zeta)\ x \;=\; (h\zeta.\texttt{powerBasis}\ \Q).\texttt{basis.repr}\ x\ \langle 0,\dots\rangle,
+\]
+so \texttt{c0\_T\_eq\_three} literally asserts $c_0(T_p)=3$. The proof of $c_0(\zeta^{p-1})=-1$ (Lemma~\ref{lem:redundant}) is derived from $\zeta^{p-1}=-(1+\dots+\zeta^{p-2})$.
+
+The development contains no \texttt{sorry}, \texttt{admit}, added \texttt{axiom}, or proof by \texttt{native\_decide}. An \texttt{\#print axioms} audit of the principal theorem reports only Lean's three foundational axioms \texttt{propext}, \texttt{Classical.choice}, and \texttt{Quot.sound}. Typechecked regression examples at $p=7,11,13$ are included. The finite $q$-difference method means the formalization uses \emph{no} analytic convergence, radial limits, or $\ell$'H\^opital; the removable singularity at $n=(p-1)/2$ noted after Lemma~\ref{lem:termderiv} requires no special case because differentiation is formal.
+
+\section{Remarks and relation to the mock Gauss-sum programme}\label{sec:remarks}
+
+\paragraph{The mock correction, made explicit.}
+The programme of~\cite{Burke2026} predicted that $T_p$ lifts in characteristic $0$ to a Gauss-sum part plus a $0/1$ mock indicator, with the constant coordinate of the Gauss-sum part vanishing (an exact consequence of $1+24=25=5^{2}$) so that $c_0(T_p)$ equals the sole surviving indicator value, conjecturally $3$. Theorem~\ref{thm:weighted} realizes this picture concretely: $T_p$ \emph{is} a pentagonal Gauss sum $\sum_n\zeta^{-A_n}$ dressed by the affine weight $\tfrac{3p-1}{2}-3n$, and the constant coordinate is exactly the weighted count of the four quadratic residues in Lemma~\ref{lem:roots}. No Eichler integral is needed; the ``one remaining computation'' of~\cite{Burke2026} is discharged by the finite identity~\eqref{eq:FRF}.
+
+\paragraph{Consistency with the obstruction.}
+The Galois non-invariance theorem of~\cite{Burke2026} guarantees that no symmetric function of the conjugates can see $c_0$. The present proof is consistent with this: it uses the \emph{ordering} of the exponents $A_n\bmod p$---which residues equal $0$ and which equal $1$---and this datum is not symmetric under $\zeta\mapsto\zeta^{t}$. The weight itself is symmetric, but the assignment of weights to the two distinguished residues is not, and it is exactly this that produces the value $3$ rather than an $O(\sqrt p)$ quantity.
+
+\paragraph{A correction to \cite{Burke2026}.}
+Lemma~\ref{lem:defect} shows $\prod_{j=1}^{k-1}(1+\zeta^{j})=1$ for \emph{every} odd $k>1$, including composite $k$. Consequently the ``composite failure'' of this product asserted in~\cite{Burke2026}, and the primality-detection reading built on it, are not correct: the product cannot distinguish primes from odd composites. This does not affect any statement in the present paper, whose hypotheses are on primes $p\ge7$; it is recorded here because the erroneous claim was flagged and corrected during formalization.
+
+\paragraph{Scope.}
+The proof uses only that $p\ge 7$ is prime (for Lemma~\ref{lem:roots}) and odd (for the cyclotomic lemmas and the reflection $A_n+2n+1\equiv A_{p-1-n}$). The primes $p=2,3,5$ are genuinely excluded: at $p=5$ the residues $a+1$ and $p-1$ coincide, and $p=3$ makes $3^{-1}$ undefined. The constant $3$ is thus a feature of primes $p\ge7$.
+
+\begin{thebibliography}{9}
+
+\bibitem{Burke2026}
+Joesph~D.~Burke~III,
+\emph{The Cyclotomic Mock-Theta Constant $c_0(T_k)=3$ as a Mock Gauss Sum},
+Zenodo preprint, 2026. https://zenodo.org/records/20767517
+
+\bibitem{Fine1988}
+N.~J.~Fine,
+\emph{Basic Hypergeometric Series and Applications},
+Mathematical Surveys and Monographs \textbf{27}, American Mathematical Society, 1988.
+
+\bibitem{AndrewsJelinek2014}
+G.~E.~Andrews and V.~Je\v{l}\'{i}nek,
+\emph{On $q$-series identities related to interval orders},
+European J. Combin. \textbf{39} (2014), 178--187.
+
+\bibitem{ChenJiLiu2012}
+W.~Y.~C.~Chen, K.~Q.~Ji, and E.~H.~Liu,
+\emph{Partition identities for Ramanujan's third-order mock theta functions},
+Q. J. Math. \textbf{63} (2012), 353--365.
+
+\bibitem{mathlib}
+The mathlib Community,
+\emph{The Lean Mathematical Library},
+in \emph{Proc. CPP 2020}, ACM, 2020, 367--381.
+
+\end{thebibliography}
+
+\end{document}

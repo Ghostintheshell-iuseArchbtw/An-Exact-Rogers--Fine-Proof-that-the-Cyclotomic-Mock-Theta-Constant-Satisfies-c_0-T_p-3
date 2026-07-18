@@ -1,0 +1,13 @@
+DUAL-LICENSE NOTICE
+
+Copyright (c) 2026 Joesph D. Burke III
+
+The paper source and compiled paper, c0_proof.tex and c0_proof.pdf, are
+licensed under the Creative Commons Attribution 4.0 International license
+(CC BY 4.0). See LICENSE-paper.
+
+The Lean source code, verification script, and other release tooling are
+licensed under the MIT License. See LICENSE-code.
+
+Release metadata and documentation may be redistributed with the source
+materials to which they apply.

@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: >-
+  Please cite the paper below when using this paper or its companion Lean
+  formalization.
+title: >-
+  An Exact Rogers--Fine Proof that the Cyclotomic Mock-Theta Constant
+  Satisfies c_0(T_p)=3
+type: software
+authors:
+  - family-names: Burke
+    given-names: Joesph D.
+    name-suffix: III
+version: 1.0.0
+date-released: 2026-07-18
+abstract: >-
+  A finite Rogers--Fine proof and Lean 4 formalization that the constant
+  power-basis coordinate of the cyclotomic mock-theta value T_p equals 3 for
+  every prime p at least 7.
+keywords:
+  - Lean
+  - Mathlib
+  - mock theta functions
+  - cyclotomic fields
+  - Rogers--Fine identity
+preferred-citation:
+  type: article
+  authors:
+    - family-names: Burke
+      given-names: Joesph D.
+      name-suffix: III
+  title: >-
+    An Exact Rogers--Fine Proof that the Cyclotomic Mock-Theta Constant
+    Satisfies c_0(T_p)=3
+  year: 2026
