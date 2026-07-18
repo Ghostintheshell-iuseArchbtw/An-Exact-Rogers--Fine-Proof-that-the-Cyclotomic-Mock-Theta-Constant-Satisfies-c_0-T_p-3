@@ -12,6 +12,8 @@ authors:
     name-suffix: III
 version: 1.0.0
 date-released: 2026-07-18
+repository-code: >-
+  https://github.com/Ghostintheshell-iuseArchbtw/An-Exact-Rogers--Fine-Proof-that-the-Cyclotomic-Mock-Theta-Constant-Satisfies-c_0-T_p-3
 abstract: >-
   A finite Rogers--Fine proof and Lean 4 formalization that the constant
   power-basis coordinate of the cyclotomic mock-theta value T_p equals 3 for

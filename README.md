@@ -93,5 +93,5 @@ The paper (`c0_proof.tex` and `c0_proof.pdf`) is licensed under CC BY 4.0; see
 License; see `LICENSE-code`. `LICENSE` records the dual-license boundary.
 
 Please cite the preferred paper citation in `CITATION.cff`. Version `1.0.0`
-was released on 2026-07-18. A repository or Zenodo URL can be added to the CFF
-metadata after the release record is assigned.
+was released on 2026-07-18. The canonical source repository is
+<https://github.com/Ghostintheshell-iuseArchbtw/An-Exact-Rogers--Fine-Proof-that-the-Cyclotomic-Mock-Theta-Constant-Satisfies-c_0-T_p-3>.
