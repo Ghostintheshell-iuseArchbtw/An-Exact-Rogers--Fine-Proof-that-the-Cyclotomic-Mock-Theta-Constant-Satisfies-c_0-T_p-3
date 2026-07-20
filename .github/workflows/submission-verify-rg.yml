@@ -1,0 +1,52 @@
+name: Submission verification with ripgrep
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@v4
+
+      - name: Install elan
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Install verification prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+
+      - name: Download pinned Mathlib cache
+        run: lake exe cache get
+
+      - name: Record verification environment
+        run: |
+          {
+            echo "commit=$(git rev-parse HEAD)"
+            lean --version
+            lake --version
+            rg --version | head -n 1
+            sha256sum verify.sh
+          } | tee verification-environment.txt
+
+      - name: Verify exact submitted project
+        shell: bash
+        run: |
+          set -o pipefail
+          ./verify.sh 2>&1 | tee verification-output.txt
+
+      - name: Upload verification record
+        uses: actions/upload-artifact@v4
+        with:
+          name: submission-verification-record
+          path: |
+            verification-environment.txt
+            verification-output.txt
+          if-no-files-found: error
